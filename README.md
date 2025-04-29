@@ -44,7 +44,7 @@ MRI QBOX (2024)
 Inventário padrão com item money
 
 Recursos de servidor em produção
-https://youtu.be/0p0K-FYdYhA
+
 
 Licença
 Este script é gratuito para uso e modificação em servidores privados. É proibida a revenda ou redistribuição sem autorização da Space Store.
