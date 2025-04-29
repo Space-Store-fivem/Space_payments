@@ -11,6 +11,10 @@ Bloqueia transações se o jogador não tiver saldo suficiente.
 Totalmente adaptável para sistemas baseados na QBOX / MRI Framework.
 
 Exportável para uso em diversos scripts (ex: lojas, missões, serviços, etc).
+## Demonstração em Vídeo
+
+[![Assista ao vídeo]([https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://youtu.be/0p0K-FYdYhA))
+
 
 Requisitos
 Framework QBOX/MRI com sistema de inventário integrado.
