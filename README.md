@@ -13,7 +13,7 @@ Totalmente adaptável para sistemas baseados na QBOX / MRI Framework.
 Exportável para uso em diversos scripts (ex: lojas, missões, serviços, etc).
 ## Demonstração em Vídeo
 
-[![Assista ao vídeo]([https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://youtu.be/0p0K-FYdYhA))
+[![Assista ao vídeo](https://img.youtube.com/vi/0p0K-FYdYhA/0.jpg)](https://youtu.be/0p0K-FYdYhA)
 
 
 Requisitos
