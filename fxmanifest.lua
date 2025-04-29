@@ -1,8 +1,8 @@
 fx_version 'cerulean'
 game 'gta5'
 
-author 'SeuNome'
-description 'space_payments - Estilo MRI Qshops'
+author 'Space Store'
+description 'space_payments - sistema de pagamentos'
 version '1.0.0'
 
 lua54 'yes'
