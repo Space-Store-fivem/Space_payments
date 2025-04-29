@@ -1,5 +1,5 @@
-Space Payments - Sistema de Pagamentos com Dinheiro do Inventário (QBOX)
-Este script permite que jogadores realizem pagamentos diretos utilizando o dinheiro armazenado no inventário, ao invés do saldo bancário. Ideal para servidores que desejam integrar um sistema de economia física e realista.
+## Space Payments - Sistema de Pagamentos com Dinheiro do Inventário (QBOX)
+Este script permite que jogadores realizem pagamentos diretos utilizando o dinheiro armazenado no inventário, ao invés do saldo bancário. Ideal para servidores que desejam integrar um sistema de economia física e realista. ##
 
 Funcionalidades
 Pagamento com dinheiro físico (money) do inventário.
@@ -29,10 +29,10 @@ No seu server.cfg, adicione:
 
 ensure space_payments
 Como Usar (Exemplo)
+
 Para usar o sistema em outros scripts:
 
-
-local amount = 500
+[local amount = 500
 
 TriggerServerEvent('space_payments:pay', amount, function(success)
     if success then
@@ -40,10 +40,11 @@ TriggerServerEvent('space_payments:pay', amount, function(success)
     else
         print("Saldo insuficiente.")
     end
-end)
+end)]
 
 Testado Com
-MRI QBOX (2024)
+MRI QBOX (2025)
+e QBOX
 
 Inventário padrão com item money
 
