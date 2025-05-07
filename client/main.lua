@@ -2,27 +2,30 @@ local ox = exports.ox_lib
 
 local phoneProp = nil
 
--- Função para iniciar animação + spawnar celular
+local animDict = "cellphone@"
+local animName = "cellphone_text_in"
+local phonePropName = "prop_phone_ing"
+
+local function StopPhoneAnim()
+    ClearPedTasks(cache.ped)
+    SetModelAsNoLongerNeeded(GetHashKey(phonePropName))
+    if phoneProp then
+        DeleteEntity(phoneProp)
+        phoneProp = nil
+    end
+    RemoveAnimDict(animDict)
+end
+
 local function StartPhoneAnim()
-    local ped = PlayerPedId()
-    RequestAnimDict("cellphone@")
-    while not HasAnimDictLoaded("cellphone@") do
-        Wait(10)
-    end
-    TaskPlayAnim(ped, "cellphone@", "cellphone_text_in", 8.0, -8.0, -1, 50, 0, false, false, false)
-
-    Wait(500)
-    local model = GetHashKey("prop_phone_ing")
-    RequestModel(model)
-    while not HasModelLoaded(model) do
-        Wait(10)
-    end
-
-    phoneProp = CreateObject(model, GetEntityCoords(ped), true, true, true)
+    StopPhoneAnim() -- Chama o stop pra garantir que o ped não esteja em outra animação
+    lib.requestAnimDict(animDict)
+    lib.requestModel(phonePropName)
+    TaskPlayAnim(cache.ped, animDict, animName, 8.0, -8.0, -1, 50, 0, false, false, false)
+    phoneProp = CreateObject(GetHashKey(phonePropName), GetEntityCoords(cache.ped), true, true, true)
     AttachEntityToEntity(
         phoneProp,
-        ped,
-        GetPedBoneIndex(ped, 28422),
+        cache.ped,
+        GetPedBoneIndex(cache.ped, 28422),
         0.0,
         0.0,
         0.0,
@@ -38,123 +41,77 @@ local function StartPhoneAnim()
     )
 end
 
--- Função para parar animação e remover prop
-local function StopPhoneAnim()
-    local ped = PlayerPedId()
-    ClearPedTasks(ped)
-    if phoneProp then
-        DeleteEntity(phoneProp)
-        phoneProp = nil
+local function getAcceptedPaymentTypes()
+    local acceptedTypes = {}
+    for k, v in pairs(Config.PaymentTypes) do
+        Log.debug("Adicionando tipo de pagamento: %s (%s)", v, k)
+        acceptedTypes[#acceptedTypes + 1] = {label = v, value = k}
     end
+    return acceptedTypes
 end
 
--- Função principal de pagamento
-local function paypal()
-    StartPhoneAnim() -- <-- começa a animação e prop
-
-    local data =
-        lib.inputDialog(
-        "Pagamento",
+local function generateInputDialog(inputType)
+    local title = inputType == "pay" and locale("ui.titlePay") or locale("ui.titleBill")
+    local valueLabel = inputType == "pay" and locale("ui.valuePay") or locale("ui.valueBill")
+    return lib.inputDialog(
+        title,
         {
-            {type = "number", label = "ID do Jogador", placeholder = "Ex: 5", icon = "user"},
-            {type = "number", label = "Valor a pagar", placeholder = "Ex: 500", icon = "dollar-sign"},
+            {type = "number", label = locale("ui.targetId"), placeholder = "5", icon = "user", required = true},
+            {type = "number", label = valueLabel, placeholder = "500", icon = "dollar-sign", required = true},
             {
                 type = "select",
-                label = "Método de pagamento",
+                label = locale("ui.paymentType"),
                 icon = "credit-card",
-                options = {
-                    {label = "Dinheiro (cash)", value = "cash"},
-                    {label = "Banco (bank)", value = "bank"}
-                }
+                options = getAcceptedPaymentTypes(),
+                required = true
             }
         }
     )
+end
+
+local function executeAction(action)
+    StartPhoneAnim() -- <-- começa a animação e prop
+
+    local input = generateInputDialog(action)
 
     StopPhoneAnim() -- <-- quando fechar, para animação e remove prop
 
-    if Config.Debug then
-        print("DEBUG: Dados inseridos no menu:", json.encode(data, {indent = true}))
-    end
-    if not data then
+    Log.debug("Dados inseridos: %s", json.encode(input, {indent = true}))
+    if not input then
         return
     end
 
-    local targetId = data[1]
-    local amount = data[2]
-    local paymentType = data[3]
+    local data = {
+        action = action,
+        targetId = tonumber(input[1]),
+        amount = tonumber(input[2]),
+        paymentType = input[3]
+    }
 
-    if not targetId or not amount or amount <= 0 or not paymentType then
-        lib.notify({description = "Informações inválidas.", type = "error"})
-        return
-    end
-
-    local result = lib.callback.await("space_payments:payPlayer", false, targetId, amount, paymentType)
+    lib.callback.await("space_payments:Server:ExecuteAction", false, data)
 end
 
--- Comando para abrir
-RegisterCommand(
-    "pagar",
-    function()
-        paypal()
+lib.callback.register(
+    "space_payments:Client:Call",
+    function(action, args)
+        Log.debug("Executando ação: %s", action)
+        if action == "pay" or action == "bill" then
+            executeAction(action)
+        else
+            Log.error("Ação inválida: %s", action)
+        end
+        return true
     end
 )
 
-RegisterCommand(
-    "cobrar",
-    function()
-        StartPhoneAnim()
-
-        local data =
-            lib.inputDialog(
-            "Cobrança",
-            {
-                {type = "number", label = "ID do Jogador", placeholder = "Ex: 5", icon = "user"},
-                {type = "number", label = "Valor a cobrar", placeholder = "Ex: 500", icon = "dollar-sign"},
-                {
-                    type = "select",
-                    label = "Método de pagamento",
-                    icon = "credit-card",
-                    options = {
-                        {label = "Dinheiro (cash)", value = "cash"},
-                        {label = "Banco (bank)", value = "bank"}
-                    }
-                }
-            }
-        )
-
-        StopPhoneAnim()
-
-        if Config.Debug then
-            print("DEBUG: Dados inseridos no menu:", json.encode(data, {indent = true}))
-        end
-
-        if not data then
-            return
-        end
-
-        local targetId = data[1]
-        local amount = data[2]
-        local paymentType = data[3]
-
-        if not targetId or not amount or amount <= 0 or not paymentType then
-            lib.notify({description = "Informações inválidas.", type = "error"})
-            if Config.Debug then
-                print("DEBUG: Informações inválidas.")
-            end
-            return
-        end
-
-        lib.callback.await("space_payments:requestPayment", false, targetId, amount, paymentType)
-    end
-)
-
-RegisterNetEvent(
-    "space_payments:client:receivePaymentRequest",
-    function(fromId, senderName, amount, paymentType)
-        if Config.Debug then
-            print("DEBUG: Recebida cobrança de:", senderName, amount, paymentType)
-        end
-
+lib.callback.register(
+    "space_payments:Client:Bill",
+    function(data)
+        Log.debug("Ação de cobrança recebida: %s", json.encode(data, {indent = true}))
+        local senderId = data.senderId
+        local senderName = data.senderName
+        local amount = data.amount
+        local paymentType = data.paymentType
         local alert =
             lib.alertDialog(
             {
@@ -167,16 +124,11 @@ RegisterNetEvent(
                 labels = {confirm = "Pagar", cancel = "Negar"}
             }
         )
-        if alert == "confirm" then
-            if Config.Debug then
-                print("DEBUG: Jogador aceitou pagar.")
-            end
-            TriggerServerEvent("space_payments:server:confirmPayment", fromId, amount, paymentType)
-        else
-            if Config.Debug then
-                print("DEBUG: Jogador recusou a cobrança.")
-            end
+
+        if alert ~= "confirm" then
             lib.notify({description = "Você recusou a cobrança.", type = "error"})
+            return false
         end
+        return true
     end
 )

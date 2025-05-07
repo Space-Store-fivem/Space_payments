@@ -1,0 +1,16 @@
+{
+    "command.pay": "Pagar a alguém",
+    "command.bill": "Cobrar alguém",
+
+    "payment.reasonFrom": "Valor pago a %s",
+    "payment.reasonTo": "Valor recebido de %s",
+    "payment.notifyFrom": "Você pagou %s.",
+    "payment.notifyTo": "Voce recebeu %s.",
+
+    "ui.titlePay": "Pagamento",
+    "ui.titleBill": "Cobrança",
+    "ui.targetId": "ID do Jogador",
+    "ui.valuePay": "Valor a Pagar",
+    "ui.valueBill": "Valor a Cobrar",
+    "ui.paymentType": "Método de Pagamento"
+}

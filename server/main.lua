@@ -1,137 +1,185 @@
 QBCore = exports["qb-core"]:GetCoreObject()
 
-lib.callback.register(
-    "space_payments:payPlayer",
-    function(source, targetId, amount, paymentType)
-        if Config.Debug then
-            print(json.encode(targetId), "target")
-            print(json.encode(amount), "amount")
-            print(json.encode(paymentType), "paymentType")
-        end
-        local src = source
-        local Player = QBCore.Functions.GetPlayer(src) -- QBCore (novo)
-        local Target = QBCore.Functions.GetPlayer(targetId) -- QBCore (novo)
-        if Config.Debug then
-            print(json.encode(Target), "Target")
-            print(json.encode(Player), "Player")
-        end
-
-        if not Player or not Target then
-            TriggerClientEvent("ox_lib:notify", src, {description = "Jogador não encontrado.", type = "error"})
-            return
-        end
-
-        local balance = Player.Functions.GetMoney(paymentType)
-        if balance < amount then
-            TriggerClientEvent(
-                "ox_lib:notify",
-                src,
-                {description = "Você não tem dinheiro suficiente.", type = "error"}
-            )
-            return
-        end
-
-        Player.Functions.RemoveMoney(paymentType, amount)
-        Target.Functions.AddMoney(paymentType, amount)
-        TriggerClientEvent(
-            "ox_lib:notify",
-            src,
-            {description = "Pagamento enviado diretamente para o inventário!", type = "info"}
+lib.addCommand(
+    Config.PayCommand,
+    {
+        help = locale("command.pay")
+        -- params = {},
+        -- restricted = "group.admin",
+    },
+    function(source, args, raw)
+        lib.callback(
+            "space_payments:Client:Call",
+            source,
+            function()
+            end,
+            "pay"
         )
-        TriggerClientEvent(
-            "ox_lib:notify",
-            targetId,
-            {description = "Você recebeu R$" .. amount .. " no seu inventário.", type = "success"}
-        )
+    end
+)
 
-        return true
+lib.addCommand(
+    Config.BillCommand,
+    {
+        help = locale("command.bill")
+        -- params = {},
+        -- restricted = "group.admin",
+    },
+    function(source, args, raw)
+        Log.debug("Comando de pagamento acionado:", source, args, raw)
+        lib.callback(
+            "space_payments:Client:Call",
+            source,
+            function()
+            end,
+            "bill"
+        )
     end
 )
 
 lib.callback.register(
-    "space_payments:requestPayment",
-    function(source, targetId, amount, paymentType)
-        if Config.Debug then
-            print("DEBUG: Callback requestPayment acionado:", source, targetId, amount, paymentType)
-        end
-
+    "space_payments:Server:ExecuteAction",
+    function(source, data)
         local src = source
+        local targetId = data.targetId
+        local amount = data.amount
+        local paymentType = data.paymentType
+
         local Player = QBCore.Functions.GetPlayer(src)
         local Target = QBCore.Functions.GetPlayer(targetId)
 
         if not Player or not Target then
-            if Config.Debug then
-                print("DEBUG: Player ou Target não encontrados.")
-            end
-            TriggerClientEvent("ox_lib:notify", src, {description = "Jogador não encontrado.", type = "error"})
+            Log.debug("Player ou Target não encontrados: %s, %s", src, targetId)
+            lib.notify(src, {description = "Jogador não encontrado.", type = "error"})
             return
         end
 
-        local senderName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
-
-        TriggerClientEvent(
-            "space_payments:client:receivePaymentRequest",
-            targetId,
-            src,
-            senderName,
-            amount,
-            paymentType
-        )
-        if Config.Debug then
-            print("DEBUG: Pedido de pagamento enviado ao jogador", targetId)
-        end
-    end
-)
-
-RegisterNetEvent(
-    "space_payments:server:confirmPayment",
-    function(requesterId, amount, paymentType)
-        local payer = source
-        if Config.Debug then
-            print("DEBUG: Evento confirmPayment acionado pelo jogador", payer)
-        end
-
-        local PayerPlayer = QBCore.Functions.GetPlayer(payer)
-        local RequesterPlayer = QBCore.Functions.GetPlayer(requesterId)
-
-        if not PayerPlayer or not RequesterPlayer then
-            if Config.Debug then
-                print("DEBUG: Payer ou Requester não encontrados.")
-            end
+        if not paymentType or not Config.PaymentTypes[paymentType] then
+            Log.debug("Tipo de pagamento inválido.", paymentType)
+            lib.notify(src, {description = "Tipo de pagamento inválido.", type = "error"})
             return
         end
 
-        local balance = PayerPlayer.Functions.GetMoney(paymentType)
-        if Config.Debug then
-            print("DEBUG: Saldo atual do jogador que vai pagar:", balance)
-        end
-
-        if balance < amount then
-            if Config.Debug then
-                print("DEBUG: Saldo insuficiente.")
-            end
-            TriggerClientEvent("ox_lib:notify", payer, {description = "Saldo insuficiente para pagar.", type = "error"})
+        if not amount or amount <= 0 then
+            Log.debug("Valor inválido.", amount)
+            lib.notify(src, {description = "Valor inválido.", type = "error"})
             return
         end
 
-        -- Remove e adiciona dinheiro
-        local remove = PayerPlayer.Functions.RemoveMoney(paymentType, amount)
-        local add = RequesterPlayer.Functions.AddMoney(paymentType, amount)
+        Log.debug("Dados recebidos: ", targetId, amount, paymentType)
+        Log.debug("Player: ", Player.PlayerData.citizenid)
+        Log.debug("Target: ", Target.PlayerData.citizenid)
 
-        if Config.Debug then
-            print("DEBUG: Remoção de dinheiro:", remove)
-            print("DEBUG: Adição de dinheiro:", add)
+        if data.action == "pay" then
+            if
+                exports.qbx_core:RemoveMoney(
+                    Player.PlayerData.citizenid,
+                    paymentType,
+                    amount,
+                    locale("payment.reasonFrom", Target.PlayerData.citizenid)
+                )
+             then
+                if
+                    exports.qbx_core:AddMoney(
+                        Target.PlayerData.citizenid,
+                        paymentType,
+                        amount,
+                        locale("payment.reasonTo", Player.PlayerData.citizenid)
+                    )
+                 then
+                    lib.notify(
+                        src,
+                        {
+                            description = locale(
+                                "payment.notifyFrom",
+                                string.format("%s%.2f", Config.MoneyUnit, amount)
+                            ),
+                            type = "success"
+                        }
+                    )
+
+                    lib.notify(
+                        targetId,
+                        {
+                            description = locale("payment.notifyTo", string.format("%s%.2f", Config.MoneyUnit, amount)),
+                            type = "success"
+                        }
+                    )
+                else
+                    Log.error("Erro ao adicionar dinheiro ao jogador: %s", Target.PlayerData.citizenid)
+                    Log.debug("Dados da transação: ", json.encode(data))
+                    lib.notify(src, {description = "Erro ao realizar pagamento.", type = "error"})
+                end
+            else
+                Log.error("Erro ao remover dinheiro do jogador: %s", Player.PlayerData.citizenid)
+                Log.debug("Dados da transação: ", json.encode(data))
+                lib.notify(src, {description = "Erro ao realizar pagamento.", type = "error"})
+            end
+        elseif data.action == "bill" then
+            local senderName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+
+            Log.debug("Pedido de cobrança enviado ao jogador: %s", targetId)
+            Log.debug("%s", json.encode(data, {indent = true}))
+            data.targetId = nil
+            data.action = nil
+            data["senderName"] = senderName
+            Log.debug("%s", json.encode(data, {indent = true}))
+            local result = lib.callback.await("space_payments:Client:Bill", targetId, data)
+            if not result then
+                Log.debug("Jogador não aceitou a cobrança.")
+                lib.notify(src, {description = "Cobrança recusada.", type = "error"})
+                return
+            end
+
+            Log.debug("Pedido de cobrança aceito pelo jogador: %s", targetId)
+
+            if
+                exports.qbx_core:RemoveMoney(
+                    Player.PlayerData.citizenid,
+                    paymentType,
+                    amount,
+                    locale("payment.reasonFrom", Target.PlayerData.citizenid)
+                )
+             then
+                if
+                    exports.qbx_core:AddMoney(
+                        Target.PlayerData.citizenid,
+                        paymentType,
+                        amount,
+                        locale("payment.reasonTo", Player.PlayerData.citizenid)
+                    )
+                 then
+                    lib.notify(
+                        src,
+                        {
+                            description = locale(
+                                "payment.notifyFrom",
+                                string.format("%s%.2f", Config.MoneyUnit, amount)
+                            ),
+                            type = "success"
+                        }
+                    )
+
+                    lib.notify(
+                        targetId,
+                        {
+                            description = locale("payment.notifyTo", string.format("%s%.2f", Config.MoneyUnit, amount)),
+                            type = "success"
+                        }
+                    )
+                    Log.debug("Cobrança realizada com sucesso.")
+                else
+                    Log.error("Erro ao adicionar dinheiro ao jogador: %s", Target.PlayerData.citizenid)
+                    Log.debug("Dados da transação: ", json.encode(data))
+                    lib.notify(src, {description = "Erro ao realizar cobrança.", type = "error"})
+                end
+            else
+                Log.error("Erro ao remover dinheiro do jogador: %s", Player.PlayerData.citizenid)
+                Log.debug("Dados da transação: ", json.encode(data))
+                lib.notify(src, {description = "Erro ao realizar cobrança.", type = "error"})
+            end
         end
 
-        -- Notificações
-        TriggerClientEvent("ox_lib:notify", payer, {description = "Você pagou R$" .. amount .. ".", type = "success"})
-        TriggerClientEvent(
-            "ox_lib:notify",
-            requesterId,
-            {
-                description = "Você recebeu R$" .. amount .. " de " .. PayerPlayer.PlayerData.charinfo.firstname,
-                type = "success"
-            }
-        )
+        return true
     end
 )
