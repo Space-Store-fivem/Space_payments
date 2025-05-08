@@ -94,11 +94,11 @@ end
 lib.callback.register(
     "space_payments:Client:Call",
     function(action, args)
-        Log.debug("Executando ação: %s", action)
+        Log.debug(locale("logs.executeAction", action))
         if action == "pay" or action == "bill" then
             executeAction(action)
         else
-            Log.error("Ação inválida: %s", action)
+            Log.error(locale("logs.invalidAction", action))
         end
         return true
     end
@@ -107,7 +107,7 @@ lib.callback.register(
 lib.callback.register(
     "space_payments:Client:Bill",
     function(data)
-        Log.debug("Ação de cobrança recebida: %s", json.encode(data, {indent = true}))
+        Log.debug(locale("logs.data", json.encode(data, {indent = true})))
         local senderId = data.senderId
         local senderName = data.senderName
         local amount = data.amount
@@ -115,20 +115,14 @@ lib.callback.register(
         local alert =
             lib.alertDialog(
             {
-                header = "Pedido de Pagamento",
-                content = senderName ..
-                    " está te cobrando R$" ..
-                        amount .. " via " .. (paymentType == "cash" and "Dinheiro" or "Banco") .. ". Aceitar?",
+                header = locale("ui.paymentRequest"),
+                content = locale("ui.paymentRequestContent", senderName, Config.MoneyUnit, amount, Config.PaymentTypes[paymentType]),
                 centered = true,
                 cancel = true,
-                labels = {confirm = "Pagar", cancel = "Negar"}
+                labels = {confirm = locale("ui.confirm"), cancel = locale("ui.cancel")},
             }
         )
 
-        if alert ~= "confirm" then
-            lib.notify({description = "Você recusou a cobrança.", type = "error"})
-            return false
-        end
-        return true
+        return alert == "confirm" and true or false
     end
 )
