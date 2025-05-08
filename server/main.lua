@@ -75,6 +75,12 @@ lib.callback.register(
 
         Log.debug(locale("logs.data", json.encode(data)))
 
+        if src == targetId then
+            Log.debug(locale("logs.selfTransaction", src))
+            notifyPlayer(src, locale("transaction.selfTransaction", action == "pay" and locale("transaction.pay") or locale("transaction.bill")), "error")
+            return
+        end
+
         local Player = QBCore.Functions.GetPlayer(src)
         local Target = QBCore.Functions.GetPlayer(targetId)
 

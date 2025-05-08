@@ -9,6 +9,9 @@
     "transaction.invalidPaymentType": "Tipo de pagamento inválido.",
     "transaction.invalidAmount": "Valor inválido.",
     "transaction.declined": "Cobrança recusada.",
+    "transaction.selfTransaction": "Você não pode %s a si mesmo.",
+    "transaction.bill": "cobrar",
+    "transaction.pay": "pagar",
     "ui.titlePay": "Pagamento",
     "ui.titleBill": "Cobrança",
     "ui.targetId": "ID do Jogador",
@@ -29,5 +32,6 @@
     "logs.billDeclined": "Cobrança recusada por %s.",
     "logs.billAccepted": "Cobrança aceita por %s.",
     "logs.executeAction": "Executando ação: %s.",
-    "logs.invalidAction": "Ação inválida: %s."
+    "logs.invalidAction": "Ação inválida: %s.",
+    "logs.selfTransaction": "Tentativa de transação própria por: %s."
 }

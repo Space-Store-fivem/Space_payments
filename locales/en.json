@@ -9,6 +9,9 @@
     "transaction.invalidPaymentType": "Invalid payment type.",
     "transaction.invalidAmount": "Invalid amount.",
     "transaction.declined": "Charge declined.",
+    "transaction.selfTransaction": "You cannot %s yourself.",
+    "transaction.bill": "charge",
+    "transaction.pay": "pay",
     "ui.titlePay": "Payment",
     "ui.titleBill": "Charge",
     "ui.targetId": "Player ID",
@@ -29,5 +32,6 @@
     "logs.billDeclined": "Charge declined by %s.",
     "logs.billAccepted": "Charge accepted by %s.",
     "logs.executeAction": "Executing action: %s.",
-    "logs.invalidAction": "Invalid action: %s."
+    "logs.invalidAction": "Invalid action: %s.",
+    "logs.selfTransaction": "Self transaction attempted by: %s."
 }
