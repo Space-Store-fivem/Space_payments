@@ -37,147 +37,87 @@ lib.addCommand(
     end
 )
 
+local function notifyPlayer(playerId, message, type)
+    lib.notify(playerId, {description = message, type = type or "info"})
+end
+
+local function logTransactionError(action, playerCid, data)
+    Log.error("Erro ao %s dinheiro do jogador: %s", action, playerCid)
+    Log.debug("Dados da transação: %s", json.encode(data))
+end
+
+local function transferMoney(fromPlayer, toPlayer, amount, paymentType)
+    local fromCid, toCid = fromPlayer.PlayerData.citizenid, toPlayer.PlayerData.citizenid
+
+    local reasonFrom = locale("payment.reasonFrom", toCid)
+    local reasonTo = locale("payment.reasonTo", fromCid)
+
+    if exports.qbx_core:RemoveMoney(fromCid, paymentType, amount, reasonFrom) then
+        if exports.qbx_core:AddMoney(toCid, paymentType, amount, reasonTo) then
+            local formattedAmount = string.format("%s%.2f", Config.MoneyUnit, amount)
+            notifyPlayer(fromPlayer.PlayerData.source, locale("payment.notifyFrom", formattedAmount), "success")
+            notifyPlayer(toPlayer.PlayerData.source, locale("payment.notifyTo", formattedAmount), "success")
+            return true
+        else
+            logTransactionError("adicionar", toCid, {from = fromCid, amount = amount, paymentType = paymentType})
+        end
+    else
+        logTransactionError("remover", fromCid, {to = toCid, amount = amount, paymentType = paymentType})
+    end
+    return false
+end
+
 lib.callback.register(
     "space_payments:Server:ExecuteAction",
     function(source, data)
         local src = source
-        local targetId = data.targetId
-        local amount = data.amount
-        local paymentType = data.paymentType
+        local targetId, amount, paymentType, action = data.targetId, data.amount, data.paymentType, data.action
 
         local Player = QBCore.Functions.GetPlayer(src)
         local Target = QBCore.Functions.GetPlayer(targetId)
 
         if not Player or not Target then
             Log.debug("Player ou Target não encontrados: %s, %s", src, targetId)
-            lib.notify(src, {description = "Jogador não encontrado.", type = "error"})
+            notifyPlayer(src, "Jogador não encontrado.", "error")
             return
         end
 
         if not paymentType or not Config.PaymentTypes[paymentType] then
-            Log.debug("Tipo de pagamento inválido.", paymentType)
-            lib.notify(src, {description = "Tipo de pagamento inválido.", type = "error"})
+            Log.debug("Tipo de pagamento inválido: %s", paymentType)
+            notifyPlayer(src, "Tipo de pagamento inválido.", "error")
             return
         end
 
         if not amount or amount <= 0 then
-            Log.debug("Valor inválido.", amount)
-            lib.notify(src, {description = "Valor inválido.", type = "error"})
+            Log.debug("Valor inválido: %s", amount)
+            notifyPlayer(src, "Valor inválido.", "error")
             return
         end
 
-        Log.debug("Dados recebidos: ", targetId, amount, paymentType)
-        Log.debug("Player: ", Player.PlayerData.citizenid)
-        Log.debug("Target: ", Target.PlayerData.citizenid)
+        Log.debug("Dados recebidos: %s, %s, %s", targetId, amount, paymentType)
+        Log.debug("Player: %s", Player.PlayerData.citizenid)
+        Log.debug("Target: %s", Target.PlayerData.citizenid)
 
-        if data.action == "pay" then
-            if
-                exports.qbx_core:RemoveMoney(
-                    Player.PlayerData.citizenid,
-                    paymentType,
-                    amount,
-                    locale("payment.reasonFrom", Target.PlayerData.citizenid)
-                )
-             then
-                if
-                    exports.qbx_core:AddMoney(
-                        Target.PlayerData.citizenid,
-                        paymentType,
-                        amount,
-                        locale("payment.reasonTo", Player.PlayerData.citizenid)
-                    )
-                 then
-                    lib.notify(
-                        src,
-                        {
-                            description = locale(
-                                "payment.notifyFrom",
-                                string.format("%s%.2f", Config.MoneyUnit, amount)
-                            ),
-                            type = "success"
-                        }
-                    )
-
-                    lib.notify(
-                        targetId,
-                        {
-                            description = locale("payment.notifyTo", string.format("%s%.2f", Config.MoneyUnit, amount)),
-                            type = "success"
-                        }
-                    )
-                else
-                    Log.error("Erro ao adicionar dinheiro ao jogador: %s", Target.PlayerData.citizenid)
-                    Log.debug("Dados da transação: ", json.encode(data))
-                    lib.notify(src, {description = "Erro ao realizar pagamento.", type = "error"})
-                end
-            else
-                Log.error("Erro ao remover dinheiro do jogador: %s", Player.PlayerData.citizenid)
-                Log.debug("Dados da transação: ", json.encode(data))
-                lib.notify(src, {description = "Erro ao realizar pagamento.", type = "error"})
-            end
-        elseif data.action == "bill" then
-            local senderName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+        if action == "pay" then
+            transferMoney(Player, Target, amount, paymentType)
+        elseif action == "bill" then
+            local senderName =
+                ("%s %s"):format(Player.PlayerData.charinfo.firstname, Player.PlayerData.charinfo.lastname)
+            data.senderName = senderName
+            data.targetId, data.action = nil, nil
 
             Log.debug("Pedido de cobrança enviado ao jogador: %s", targetId)
             Log.debug("%s", json.encode(data, {indent = true}))
-            data.targetId = nil
-            data.action = nil
-            data["senderName"] = senderName
-            Log.debug("%s", json.encode(data, {indent = true}))
-            local result = lib.callback.await("space_payments:Client:Bill", targetId, data)
-            if not result then
+
+            local accepted = lib.callback.await("space_payments:Client:Bill", targetId, data)
+            if not accepted then
                 Log.debug("Jogador não aceitou a cobrança.")
-                lib.notify(src, {description = "Cobrança recusada.", type = "error"})
+                notifyPlayer(src, "Cobrança recusada.", "error")
                 return
             end
 
-            Log.debug("Pedido de cobrança aceito pelo jogador: %s", targetId)
-
-            if
-                exports.qbx_core:RemoveMoney(
-                    Player.PlayerData.citizenid,
-                    paymentType,
-                    amount,
-                    locale("payment.reasonFrom", Target.PlayerData.citizenid)
-                )
-             then
-                if
-                    exports.qbx_core:AddMoney(
-                        Target.PlayerData.citizenid,
-                        paymentType,
-                        amount,
-                        locale("payment.reasonTo", Player.PlayerData.citizenid)
-                    )
-                 then
-                    lib.notify(
-                        src,
-                        {
-                            description = locale(
-                                "payment.notifyFrom",
-                                string.format("%s%.2f", Config.MoneyUnit, amount)
-                            ),
-                            type = "success"
-                        }
-                    )
-
-                    lib.notify(
-                        targetId,
-                        {
-                            description = locale("payment.notifyTo", string.format("%s%.2f", Config.MoneyUnit, amount)),
-                            type = "success"
-                        }
-                    )
-                    Log.debug("Cobrança realizada com sucesso.")
-                else
-                    Log.error("Erro ao adicionar dinheiro ao jogador: %s", Target.PlayerData.citizenid)
-                    Log.debug("Dados da transação: ", json.encode(data))
-                    lib.notify(src, {description = "Erro ao realizar cobrança.", type = "error"})
-                end
-            else
-                Log.error("Erro ao remover dinheiro do jogador: %s", Player.PlayerData.citizenid)
-                Log.debug("Dados da transação: ", json.encode(data))
-                lib.notify(src, {description = "Erro ao realizar cobrança.", type = "error"})
-            end
+            Log.debug("Cobrança aceita por: %s", targetId)
+            transferMoney(Player, Target, amount, paymentType)
         end
 
         return true
